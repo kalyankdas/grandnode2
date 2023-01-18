@@ -31,7 +31,7 @@ using Grand.Domain.Tasks;
 using Grand.Domain.Tax;
 using Grand.Domain.Vendors;
 using Grand.Infrastructure;
-using Grand.Infrastructure.TypeSearchers;
+using Grand.Infrastructure.TypeSearch;
 using Grand.SharedKernel;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -378,7 +378,7 @@ namespace Grand.Business.System.Services.Installation
         protected virtual async Task HashDefaultCustomerPassword(string defaultUserEmail, string defaultUserPassword)
         {
             var customerManagerService = _serviceProvider.GetRequiredService<ICustomerManagerService>();
-            await customerManagerService.ChangePassword(new ChangePasswordRequest(defaultUserEmail, false, PasswordFormat.Hashed, defaultUserPassword));
+            await customerManagerService.ChangePassword(new ChangePasswordRequest(defaultUserEmail, PasswordFormat.Hashed, defaultUserPassword));
         }
 
         private async Task CreateIndexes(IDatabaseContext dbContext, DataSettings dataSettings)

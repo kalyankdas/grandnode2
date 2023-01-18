@@ -1,7 +1,7 @@
-﻿@model IList<Grand.Web.Models.Common.ContactUsModel.ContactAttributeModel>
-@using Grand.Domain.Media;
-@using System.Text;
-@inject Grand.Business.Core.Interfaces.Storage.IDownloadService downloadService
+﻿@using Grand.Business.Core.Interfaces.Storage
+@using Grand.Domain.Media
+@model IList<ContactUsModel.ContactAttributeModel>
+@inject IDownloadService downloadService
 
 @if (Model.Any())
 {
@@ -9,9 +9,10 @@
     <div class="form-group contact-attributes">
         @foreach (var attribute in Model)
         {
-            string controlId = string.Format("contact_attribute_{0}", attribute.Id);
-            string textPrompt = !string.IsNullOrEmpty(attribute.TextPrompt) ? attribute.TextPrompt : attribute.Name;
-        <div id="@string.Format("contact_attribute_label_{0}", attribute.Id)" class="col-12 px-0">
+            var controlId = $"contact_attribute_{attribute.Id}";
+            var controlName = $"attributes[{attribute.Id}]";
+            var textPrompt = !string.IsNullOrEmpty(attribute.TextPrompt) ? attribute.TextPrompt : attribute.Name;
+        <div id="@($"contact_attribute_label_{attribute.Id}")" class="col-12 px-0">
             <span class="col-form-label text-prompt">
                 @textPrompt
             </span>
@@ -25,13 +26,13 @@
                 case AttributeControlType.TextBox:
                     {
                         <label for="@(controlId)" class="sr-only">"@(controlId)</label>
-                        <input name="@(controlId)" type="text" class="form-control textbox" id="@(controlId)" value="@(attribute.DefaultValue)" />
+                        <input name="@(controlName)" type="text" class="form-control textbox" id="@(controlId)" value="@(attribute.DefaultValue)" />
                     }
                     break;
                 case AttributeControlType.DropdownList:
                     {
                         <label for="@(controlId)" class="sr-only">"@(controlId)</label>
-                        <select id="@(controlId)" class="form-control custom-select" name="@(controlId)">
+                        <select id="@(controlId)" class="form-control custom-select" name="@(controlName)">
                             @if (!attribute.IsRequired)
                             {
                                 <option value="">---</option>
@@ -42,7 +43,7 @@
                                 <option selected="@attributeValue.IsPreSelected" value="@(attributeValue.Id)">@attributeName</option>
                             }
                         </select>
-                        attributeChangeScriptsBuilder.AppendFormat("document.querySelector('#{0}').addEventListener('change',function(){{contactAttributeChange();}});\n", controlId);
+                        attributeChangeScriptsBuilder.Append($"document.querySelector('#{controlId}').addEventListener('change',function(){{contactAttributeChange();}});\n");
                     }
                     break;
                 case AttributeControlType.RadioList:
@@ -57,14 +58,14 @@
                                             @(controlId)
                                         </legend>
                                         <label class="custom-control custom-radio">
-                                            <input class="custom-control-input" id="@(controlId)_@(attributeValue.Id)" type="radio" name="@(controlId)" value="@attributeValue.Id" checked="@attributeValue.IsPreSelected" />
+                                            <input class="custom-control-input" id="@(controlId)_@(attributeValue.Id)" type="radio" name="@(controlName)" value="@attributeValue.Id" checked="@attributeValue.IsPreSelected" />
                                             <span class="custom-control-label"></span>
                                             <span class="custom-control-description" for="@(controlId)_@(attributeValue.Id)">@attributeName</span>
                                         </label>
 
                                     </fieldset>
                                 </li>
-                                attributeChangeScriptsBuilder.AppendFormat("document.querySelector('#{0}_{1}').addEventListener('click',function(){{contactAttributeChange();}});\n", controlId, attributeValue.Id);
+                                attributeChangeScriptsBuilder.Append($"document.querySelector('#{controlId}_{attributeValue.Id}').addEventListener('click',function(){{contactAttributeChange();}});\n");
                             }
                         </ul>
                     }
@@ -79,12 +80,12 @@
                                     var attributeName = attributeValue.Name;
                                     <li>
                                         <label class="custom-control custom-checkbox">
-                                            <input class="custom-control-input" id="@(controlId)_@(attributeValue.Id)" type="checkbox" name="@(controlId)" value="@(attributeValue.Id)" checked="@(attributeValue.IsPreSelected)" @(attribute.AttributeControlType == AttributeControlType.ReadonlyCheckboxes ? Html.Raw(" disabled=\"disabled\"") : null) />
+                                            <input class="custom-control-input" id="@(controlId)_@(attributeValue.Id)" type="checkbox" name="@(controlName)" value="@(attributeValue.Id)" checked="@(attributeValue.IsPreSelected)" @(attribute.AttributeControlType == AttributeControlType.ReadonlyCheckboxes ? Html.Raw(" disabled=\"disabled\"") : null) />
                                             <span class="custom-control-label"></span>
                                             <span class="custom-control-description" for="@(controlId)_@(attributeValue.Id)">@attributeName</span>
                                         </label>
                                     </li>
-                                    attributeChangeScriptsBuilder.AppendFormat("document.querySelector('#{0}_{1}').addEventListener('click',function(){{contactAttributeChange();}});\n", controlId, attributeValue.Id);
+                                    attributeChangeScriptsBuilder.Append($"document.querySelector('#{controlId}_{attributeValue.Id}').addEventListener('click',function(){{contactAttributeChange();}});\n");
                                 }
                             </ul>
                         </fieldset>
@@ -98,14 +99,14 @@
                     break;
                 case AttributeControlType.Datepicker:
                     {
-                        <date-picker-dropdown control-day="@(controlId + "_day")"
-                                              control-month="@(controlId + "_month")"
-                                              control-year="@(controlId + "_year")"
+                        <date-picker-dropdown control-day="@($"attributes[{attribute.Id}_day]")"
+                                              control-month="@($"attributes[{attribute.Id}_month]")"
+                                              control-year="@($"attributes[{attribute.Id}_year]")"
                                               begin-year="@(DateTime.Now.Year)"
                                               end-year="@(DateTime.Now.Year+1)"
-                                              selected-day="(attribute.SelectedDay.HasValue ? attribute.SelectedDay.Value : 0)"
-                                              selected-month="(attribute.SelectedMonth.HasValue ? attribute.SelectedMonth.Value : 0)"
-                                              selected-year="(attribute.SelectedYear.HasValue ? attribute.SelectedYear.Value : 0)"
+                                              selected-day="attribute.SelectedDay ?? 0"
+                                              selected-month="attribute.SelectedMonth ?? 0"
+                                              selected-year="attribute.SelectedYear ?? 0"
                                               PartialViewName="Partials/DatePickerDropDowns"
                                               class="input-group" />
                     }
@@ -113,7 +114,7 @@
                 case AttributeControlType.FileUpload:
                     {
                         Download download = null;
-                        if (!String.IsNullOrEmpty(attribute.DefaultValue))
+                        if (!string.IsNullOrEmpty(attribute.DefaultValue))
                         {
                             download = await downloadService.GetDownloadByGuid(new Guid(attribute.DefaultValue));
                         }
@@ -123,16 +124,16 @@
 
                         if (download != null)
                         {
-                            <input id="@(controlId)" name="@(controlId)" type="hidden" value="@download.DownloadGuid" />
+                            <input id="@(controlId)" name="@(controlName)" type="hidden" value="@download.DownloadGuid" />
                         }
                         else
                         {
-                            <input id="@(controlId)" name="@(controlId)" type="hidden" />
+                            <input id="@(controlId)" name="@(controlName)" type="hidden" />
                         }
                         <template>
                             <b-form-file accept="@Html.Raw(allowedFileExtensions)" type="file" id="qqfile" name="qqfile" onchange="uploadFile(this)" />
                         </template>
-                        <input class="hidden-upload-input" type="hidden" onchange="contactAttributeChange()" id="@(controlId)" name="@(controlId)" />
+                        <input class="hidden-upload-input" type="hidden" onchange="contactAttributeChange()" id="@(controlId)" name="@(controlName)" />
                         <div id="download-message" class="alert my-2" style="display:none;"></div>
                         <a id="@(controlId)downloadurl'" class="download-file btn btn-outline-info" style="display:none;">
                             Download
@@ -184,15 +185,15 @@
                             @foreach (var attributeValue in attribute.Values)
                             {
                                 var attributeName = attributeValue.Name;
-                                <li class="mr-1 p-0" @(attributeValue.IsPreSelected ? @Html.Raw(" class=\"selected-value border border-primary\"") : null)>
+                                <li class="mr-1 p-0" @(attributeValue.IsPreSelected ? Html.Raw(" class=\"selected-value border border-primary\"") : null)>
                                     <label for="@(controlId)_@(attributeValue.Id)" class="mb-0">
-                                        <input id="@(controlId)_@(attributeValue.Id)" type="radio" name="@(controlId)" value="@attributeValue.Id" checked="@attributeValue.IsPreSelected" />
+                                        <input id="@(controlId)_@(attributeValue.Id)" type="radio" name="@(controlName)" value="@attributeValue.Id" checked="@attributeValue.IsPreSelected" />
                                         <span class="color-container" title="@attributeName">
                                             <span class="color" style="background-color:@(attributeValue.ColorSquaresRgb);">&nbsp;</span>
                                         </span>
                                     </label>
                                 </li>
-                                attributeChangeScriptsBuilder.AppendFormat("document.querySelector('#{0}_{1}').addEventListener('click',function(){{contactAttributeChange();}});\n", controlId, attributeValue.Id);
+                                attributeChangeScriptsBuilder.Append($"document.querySelector('#{controlId}_{attributeValue.Id}').addEventListener('click',function(){{contactAttributeChange();}});\n");
                             }
                         </ul>
                         <script asp-location="Footer">

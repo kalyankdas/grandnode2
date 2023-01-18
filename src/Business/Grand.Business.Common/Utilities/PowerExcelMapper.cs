@@ -1,14 +1,9 @@
 ﻿using Ganss.Excel;
 using Ganss.Excel.Exceptions;
 using NPOI.SS.UserModel;
-using System;
 using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
-using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
 
 namespace Grand.Business.Common.Utilities
 {
@@ -16,6 +11,7 @@ namespace Grand.Business.Common.Utilities
     {
 
         Dictionary<string, Dictionary<int, object>> Objects { get; set; } = new();
+        IWorkbook Workbook { get; set; }
 
         static async Task<Stream> ReadAsync(Stream stream)
         {
@@ -23,21 +19,22 @@ namespace Grand.Business.Common.Utilities
             await stream.CopyToAsync(ms);
             return ms;
         }
-
-        /// <summary>
-        /// Fetches objects from the specified sheet index using async I/O.
-        /// </summary>
-        /// <typeparam name="T">The type of objects the Excel file is mapped to.</typeparam>
-        /// <param name="stream">The stream the Excel file is read from.</param>
-        /// <param name="sheetIndex">Index of the sheet.</param>
-        /// <param name="valueParser">Allow value parsing</param>
-        /// <returns>The objects read from the Excel file.</returns>
         public new async Task<IEnumerable<T>> FetchAsync<T>(Stream stream, int sheetIndex = 0, Func<string, object, object> valueParser = null)
         {
             using var ms = await ReadAsync(stream);
             return Fetch(ms, typeof(T), sheetIndex, valueParser).OfType<T>();
         }
-
+        public new IEnumerable Fetch(Stream stream, Type type, int sheetIndex, Func<string, object, object> valueParser = null)
+        {
+            Workbook = WorkbookFactory.Create(stream);
+            return Fetch(type, sheetIndex, valueParser);
+        }
+        public new IEnumerable Fetch(Type type, int sheetIndex = 0, Func<string, object, object> valueParser = null)
+        {
+            var sheet = Workbook.GetSheetAt(sheetIndex);
+            return Fetch(sheet, type, valueParser);
+        }
+               
         IEnumerable Fetch(ISheet sheet, Type type, Func<string, object, object> valueParser = null)
         {
             var firstRowNumber = HeaderRowNumber;
@@ -89,7 +86,7 @@ namespace Grand.Business.Common.Utilities
         {
             var sheet = row.Sheet;
             var i = row.RowNum;
-            List<(PowerColumnInfo Col, object CellValue, ICell Cell, int ColumnIndex)> initValues = new();
+            List<(ColumnInfo Col, object CellValue, ICell Cell, int ColumnIndex)> initValues = new();
             var columns = cells
                 .Select(c => (Index: c.ColumnIndex,
                     Columns: GetColumnInfo(typeMapper, c).Where(c => c.Directions.HasFlag(MappingDirections.ExcelToObject) && !c.IsSubType).ToList()))
@@ -102,7 +99,7 @@ namespace Grand.Business.Common.Utilities
 
                 if (cell != null && (!SkipBlankCells || !IsCellBlank(cell)))
                 {
-                    foreach (PowerColumnInfo ci in columnInfos)
+                    foreach (ColumnInfo ci in columnInfos)
                     {
                         object cellValue;
 
@@ -133,7 +130,7 @@ namespace Grand.Business.Common.Utilities
 
             if (!IgnoreNestedTypes)
             {
-                foreach (PowerColumnInfo ci in typeMapper.ColumnsByName.SelectMany(c => c.Value).Where(c => c.IsSubType))
+                foreach (ColumnInfo ci in typeMapper.ColumnsByName.SelectMany(c => c.Value).Where(c => c.IsSubType))
                 {
                     if (!callChain.Contains(ci.PropertyType) // check for cycle in type hierarchy
                         && !initValues.Any(v => v.Col.Property.IsIdenticalTo(ci.Property))) // map subtypes only if not already mapped
@@ -166,7 +163,7 @@ namespace Grand.Business.Common.Utilities
                                 object v;
 
                                 if (initVal.Cell != null)
-                                    v = initVal.Col.GetPropertyValue(null, initVal.CellValue, initVal.Cell);
+                                    v = PowerExcelExtensions.GetPropertyValue(initVal.Col, null, initVal.CellValue, initVal.Cell);
                                 else
                                     v = initVal.CellValue;
 
@@ -220,7 +217,7 @@ namespace Grand.Business.Common.Utilities
                     try
                     {
                         if (val.Cell != null)
-                            val.Col.SetProperty(o, val.CellValue, val.Cell);
+                            PowerExcelExtensions.SetProperty(val.Col, o, val.CellValue, val.Cell);
                         else
                             val.Col.Property.SetValue(o, val.CellValue);
                     }
@@ -247,8 +244,7 @@ namespace Grand.Business.Common.Utilities
             if (!parsingError.Cancel)
                 throw excelMapperConvertException;
         }
-
-        private Func<string, string> NormalizeName { get; set; }
+        
         List<ColumnInfo> GetColumnInfo(TypeMapper typeMapper, ICell cell)
         {
             var colByIndex = typeMapper.GetColumnByIndex(cell.ColumnIndex);

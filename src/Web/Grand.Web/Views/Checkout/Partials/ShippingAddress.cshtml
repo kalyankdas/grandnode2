@@ -23,30 +23,30 @@
                     <label class="genera" for="shipping-address-select">@Loc["Checkout.SelectShippingAddressOrEnterNewOne"]</label>
                 </div>
                 <div class="col-12 px-0">
-                    <select name="shipping_address_id" ref="shippingSelect" id="shipping-address-select" class="custom-select address-select"
+                    <select name="ShippingAddressId" ref="shippingSelect" id="shipping-address-select" class="custom-select address-select"
                              onchange="vmorder.vShipping.newAddress(!this.value)">
                         @foreach (var address in Model.ExistingAddresses)
                         {
                             var addressLine = "";
                             addressLine += address.FirstName;
                             addressLine += " " + address.LastName;
-                            if (address.StreetAddressEnabled && !String.IsNullOrEmpty(address.Address1))
+                            if (address.StreetAddressEnabled && !string.IsNullOrEmpty(address.Address1))
                             {
                                 addressLine += ", " + address.Address1;
                             }
-                            if (address.CityEnabled && !String.IsNullOrEmpty(address.City))
+                            if (address.CityEnabled && !string.IsNullOrEmpty(address.City))
                             {
                                 addressLine += ", " + address.City;
                             }
-                            if (address.StateProvinceEnabled && !String.IsNullOrEmpty(address.StateProvinceName))
+                            if (address.StateProvinceEnabled && !string.IsNullOrEmpty(address.StateProvinceName))
                             {
                                 addressLine += ", " + address.StateProvinceName;
                             }
-                            if (address.ZipPostalCodeEnabled && !String.IsNullOrEmpty(address.ZipPostalCode))
+                            if (address.ZipPostalCodeEnabled && !string.IsNullOrEmpty(address.ZipPostalCode))
                             {
                                 addressLine += " " + address.ZipPostalCode;
                             }
-                            if (address.CountryEnabled && !String.IsNullOrWhiteSpace(address.CountryName))
+                            if (address.CountryEnabled && !string.IsNullOrWhiteSpace(address.CountryName))
                             {
                                 addressLine += ", " + address.CountryName;
                             }
@@ -61,9 +61,14 @@
         <div class="new-shipping-address" id="shipping-new-address-form" ref="newShippingAddress">
             <div class="enter-address">
                 @{
-                    var dataDictAddress = new ViewDataDictionary(ViewData);
-                    dataDictAddress.TemplateInfo.HtmlFieldPrefix = "ShippingNewAddress";
-                    <partial name="Partials/CreateOrUpdateAddress" model="Model.NewAddress" view-data="dataDictAddress" />
+                    var dataDictAddress = new ViewDataDictionary(ViewData)
+                    {
+                        TemplateInfo =
+                        {
+                            HtmlFieldPrefix = "ShippingNewAddress"
+                        }
+                    };
+                    <partial name="Partials/CreateOrUpdateAddress" model="Model.ShippingNewAddress" view-data="dataDictAddress" />
                 }
                 <div asp-validation-summary="ModelOnly" class="message-error"></div>
                 <template v-if="vmorder.shippingAddressErrors !== null">

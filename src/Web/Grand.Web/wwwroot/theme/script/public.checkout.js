@@ -219,7 +219,7 @@ var vmorder = new Vue({
                                 } else {
                                     index = 0;
                                 }
-                                var elem = model.ShippingMethods[index].Name + '___' + model.ShippingMethods[index].ShippingRateProviderSystemName;
+                                var elem = model.ShippingMethods[index].Name + ':' + model.ShippingMethods[index].ShippingRateProviderSystemName;
                                 vmorder.loadPartialView(elem);
                             }
                             vmorder.updateTotals();
@@ -775,8 +775,7 @@ var vmorder = new Vue({
                 data: null,
                 headers: {
                     'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-Response-View': 'Json'
+                    'Content-Type': 'application/json'
                 },
                 showLoader: false
             }).then(response => {
@@ -790,8 +789,7 @@ var vmorder = new Vue({
                 data: null,
                 headers: {
                     'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-Response-View': 'Json'
+                    'Content-Type': 'application/json'
                 },
                 showLoader: false
             }).then(response => {

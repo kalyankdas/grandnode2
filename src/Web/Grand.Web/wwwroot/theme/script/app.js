@@ -270,8 +270,7 @@ var vm = new Vue({
                 data: null,
                 headers: {
                     'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-Response-View': 'Json'
+                    'Content-Type': 'application/json'
                 },
                 showLoader: false
             }).then(response => (
@@ -309,8 +308,7 @@ var vm = new Vue({
                 data: null,
                 headers: {
                     'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-Response-View': 'Json'
+                    'Content-Type': 'application/json'
                 },
                 showLoader: false
             }).then(response => {
@@ -318,14 +316,15 @@ var vm = new Vue({
                 this.compareproducts = response.data
             })
         },
-        removeFromCompareList: function (id) {
-            if (id !== undefined) {
+        removeFromCompareList: function (product, index) {
+            if (product !== undefined) {
                 const compareList = AxiosCart.getCookie('Grand.CompareProduct');
-                const newCompareList = compareList.replace(id, '');
-
+                const newCompareList = compareList.replace(product.Id, '');
                 AxiosCart.setCookie('Grand.CompareProduct', newCompareList);
+                vm.compareproducts.Products.splice(index, 1);
             } else {
                 AxiosCart.setCookie('Grand.CompareProduct', '');
+                vm.compareproducts.Products.splice(0);
             }
             this.updateCompareProductsQty();
         },
@@ -397,7 +396,10 @@ var vm = new Vue({
                 } else {
                     if (response.data.price) {
                         if (vm.PopupQuickViewVueModal.ProductType == 0) {
-                            vm.PopupQuickViewVueModal.ProductPrice.Price = response.data.price;
+                            if(vm.PopupQuickViewVueModal.ProductPrice.PriceWithDiscount!=null)
+                                vm.PopupQuickViewVueModal.ProductPrice.PriceWithDiscount = response.data.price;
+                            else
+                                vm.PopupQuickViewVueModal.ProductPrice.Price = response.data.price;
                         } else {
                             vm.PopupQuickViewVueModal.AssociatedProducts.find(x => x.Id === pId).ProductPrice.Price = response.data.price;
                         }
@@ -429,14 +431,14 @@ var vm = new Vue({
                             document.querySelector('#product_attribute_input_' + response.data.disabledattributemappingids[i]).style.display = "none";
                         }
                     }
-                    if (response.data.notAvailableAttributeMappingids) {
+                    /*if (response.data.notAvailableAttributeMappingids) {
                         document.querySelectorAll('[data-disable]').forEach((element) => element.disabled = false);
                         for (var i = 0; i < response.data.notAvailableAttributeMappingids.length; i++) {
                             if (document.querySelectorAll("[data-disable='" + response.data.notAvailableAttributeMappingids[i] + "']").length > 0) {
                                 document.querySelectorAll("[data-disable='" + response.data.notAvailableAttributeMappingids[i] + "']")[0].disabled = true;
                             }
                         }
-                    }
+                    }*/
                     if (response.data.pictureDefaultSizeUrl !== null) {
                         vm.PopupQuickViewVueModal.DefaultPictureModel.ImageUrl = response.data.pictureDefaultSizeUrl;
                     }
@@ -498,8 +500,7 @@ var vm = new Vue({
                 params: { "productId": id },
                 headers: {
                     'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-Response-View': 'Json'
+                    'Content-Type': 'application/json'
                 }
             }).then(function (response) {
                 vm.RelatedProducts = response.data;
@@ -515,8 +516,7 @@ var vm = new Vue({
                 method: 'post',
                 headers: {
                     'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-Response-View': 'Json'
+                    'Content-Type': 'application/json'
                 }
             }).then(function (response) {
                 if (response.data.stockAvailability) {

@@ -88,7 +88,6 @@ namespace Grand.Web.Commands.Handler.Common
             var contactAttributes = await _contactAttributeService.GetAllContactAttributes(request.Store.Id);
             foreach (var attribute in contactAttributes)
             {
-                string controlId = string.Format("contact_attribute_{0}", attribute.Id);
                 switch (attribute.AttributeControlType)
                 {
                     case AttributeControlType.DropdownList:
@@ -96,7 +95,7 @@ namespace Grand.Web.Commands.Handler.Common
                     case AttributeControlType.ColorSquares:
                     case AttributeControlType.ImageSquares:
                         {
-                            request.Form.TryGetValue(controlId, out var ctrlAttributes);
+                            var ctrlAttributes = request.Model.Attributes.FirstOrDefault(x => x.Key == attribute.Id)?.Value;
                             if (!string.IsNullOrEmpty(ctrlAttributes))
                             {
                                 customAttributes = _contactAttributeParser.AddContactAttribute(customAttributes,
@@ -107,10 +106,11 @@ namespace Grand.Web.Commands.Handler.Common
                         break;
                     case AttributeControlType.Checkboxes:
                         {
-                            request.Form.TryGetValue(controlId, out var cblAttributes);
+                            var cblAttributes = request.Model.Attributes.FirstOrDefault(x => x.Key == attribute.Id)?.Value;
+                            
                             if (!string.IsNullOrEmpty(cblAttributes))
                             {
-                                foreach (var item in cblAttributes)
+                                foreach (var item in cblAttributes.Split(','))
                                 {
                                     customAttributes = _contactAttributeParser.AddContactAttribute(customAttributes, attribute, item).ToList();
                                 }
@@ -127,17 +127,17 @@ namespace Grand.Web.Commands.Handler.Common
                                 .ToList())
                             {
                                 customAttributes = _contactAttributeParser.AddContactAttribute(customAttributes,
-                                            attribute, selectedAttributeId.ToString()).ToList();
+                                            attribute, selectedAttributeId).ToList();
                             }
                         }
                         break;
                     case AttributeControlType.TextBox:
                     case AttributeControlType.MultilineTextbox:
                         {
-                            request.Form.TryGetValue(controlId, out var ctrlAttributes);
+                            var ctrlAttributes = request.Model.Attributes.FirstOrDefault(x => x.Key == attribute.Id)?.Value;
                             if (!string.IsNullOrEmpty(ctrlAttributes))
                             {
-                                var enteredText = ctrlAttributes.ToString().Trim();
+                                var enteredText = ctrlAttributes.Trim();
                                 customAttributes = _contactAttributeParser.AddContactAttribute(customAttributes,
                                     attribute, enteredText).ToList();
                             }
@@ -145,13 +145,13 @@ namespace Grand.Web.Commands.Handler.Common
                         break;
                     case AttributeControlType.Datepicker:
                         {
-                            request.Form.TryGetValue(controlId + "_day", out var date);
-                            request.Form.TryGetValue(controlId + "_month", out var month);
-                            request.Form.TryGetValue(controlId + "_year", out var year);
+                            var date = request.Model.Attributes.FirstOrDefault(x => x.Key == attribute.Id+ "_day")?.Value;
+                            var month = request.Model.Attributes.FirstOrDefault(x => x.Key == attribute.Id+ "_month")?.Value;
+                            var year = request.Model.Attributes.FirstOrDefault(x => x.Key == attribute.Id+ "_year")?.Value;
                             DateTime? selectedDate = null;
                             try
                             {
-                                selectedDate = new DateTime(Int32.Parse(year), Int32.Parse(month), Int32.Parse(date));
+                                selectedDate = new DateTime(int.Parse(year), int.Parse(month), int.Parse(date));
                             }
                             catch { }
                             if (selectedDate.HasValue)
@@ -163,7 +163,7 @@ namespace Grand.Web.Commands.Handler.Common
                         break;
                     case AttributeControlType.FileUpload:
                         {
-                            request.Form.TryGetValue(controlId, out var guid);
+                            var guid = request.Model.Attributes.FirstOrDefault(x => x.Key == attribute.Id)?.Value;
                             Guid.TryParse(guid, out Guid downloadGuid);
                             var download = await _downloadService.GetDownloadByGuid(downloadGuid);
                             if (download != null)
@@ -172,8 +172,6 @@ namespace Grand.Web.Commands.Handler.Common
                                            attribute, download.DownloadGuid.ToString()).ToList();
                             }
                         }
-                        break;
-                    default:
                         break;
                 }
             }
@@ -200,32 +198,30 @@ namespace Grand.Web.Commands.Handler.Common
             foreach (var a2 in attributes2)
             {
                 var conditionMet = await _contactAttributeParser.IsConditionMet(a2, customAttributes);
-                if (a2.IsRequired && ((conditionMet.HasValue && conditionMet.Value) || !conditionMet.HasValue))
+                if (!a2.IsRequired ||
+                    ((!conditionMet.HasValue || !conditionMet.Value) && conditionMet.HasValue)) continue;
+                var found = false;
+                //selected checkout attributes
+                foreach (var a1 in attributes1)
                 {
-                    var found = false;
-                    //selected checkout attributes
-                    foreach (var a1 in attributes1)
-                    {
-                        if (a1.Id == a2.Id)
+                    if (a1.Id != a2.Id) continue;
+                    var attributeValuesStr = customAttributes.Where(x => x.Key == a1.Id).Select(x => x.Value).ToList();
+                    foreach (var str1 in attributeValuesStr)
+                        if (!string.IsNullOrEmpty(str1.Trim()))
                         {
-                            var attributeValuesStr = customAttributes.Where(x => x.Key == a1.Id).Select(x => x.Value).ToList();
-                            foreach (var str1 in attributeValuesStr)
-                                if (!string.IsNullOrEmpty(str1.Trim()))
-                                {
-                                    found = true;
-                                    break;
-                                }
+                            found = true;
+                            break;
                         }
-                    }
+                }
 
-                    //if not found
-                    if (!found)
-                    {
-                        if (!string.IsNullOrEmpty(a2.GetTranslation(a => a.TextPrompt, _workContext.WorkingLanguage.Id)))
-                            warnings.Add(a2.GetTranslation(a => a.TextPrompt, _workContext.WorkingLanguage.Id));
-                        else
-                            warnings.Add(string.Format(_translationService.GetResource("ContactUs.SelectAttribute"), a2.GetTranslation(a => a.Name, _workContext.WorkingLanguage.Id)));
-                    }
+                //if not found
+                if (!found)
+                {
+                    warnings.Add(
+                        !string.IsNullOrEmpty(a2.GetTranslation(a => a.TextPrompt, _workContext.WorkingLanguage.Id))
+                            ? a2.GetTranslation(a => a.TextPrompt, _workContext.WorkingLanguage.Id)
+                            : string.Format(_translationService.GetResource("ContactUs.SelectAttribute"),
+                                a2.GetTranslation(a => a.Name, _workContext.WorkingLanguage.Id)));
                 }
             }
 
@@ -237,8 +233,7 @@ namespace Grand.Web.Commands.Handler.Common
                 if (ca.ValidationMinLength.HasValue)
                 {
 
-                    if (ca.AttributeControlType == AttributeControlType.TextBox ||
-                        ca.AttributeControlType == AttributeControlType.MultilineTextbox)
+                    if (ca.AttributeControlType is AttributeControlType.TextBox or AttributeControlType.MultilineTextbox)
                     {
                         var conditionMet = await _contactAttributeParser.IsConditionMet(ca, customAttributes);
                         if (ca.IsRequired && ((conditionMet.HasValue && conditionMet.Value) || !conditionMet.HasValue))
@@ -256,24 +251,21 @@ namespace Grand.Web.Commands.Handler.Common
                 }
 
                 //maximum length
-                if (ca.ValidationMaxLength.HasValue)
+                if (!ca.ValidationMaxLength.HasValue) continue;
                 {
-                    if (ca.AttributeControlType == AttributeControlType.TextBox ||
-                        ca.AttributeControlType == AttributeControlType.MultilineTextbox)
-                    {
-                        var conditionMet = await _contactAttributeParser.IsConditionMet(ca, customAttributes);
-                        if (ca.IsRequired && ((conditionMet.HasValue && conditionMet.Value) || !conditionMet.HasValue))
-                        {
-                            var valuesStr = customAttributes.Where(x => x.Key == ca.Id).Select(x => x.Value).ToList();
-                            var enteredText = valuesStr.FirstOrDefault();
-                            var enteredTextLength = string.IsNullOrEmpty(enteredText) ? 0 : enteredText.Length;
+                    if (ca.AttributeControlType != AttributeControlType.TextBox &&
+                        ca.AttributeControlType != AttributeControlType.MultilineTextbox) continue;
+                    var conditionMet = await _contactAttributeParser.IsConditionMet(ca, customAttributes);
+                    if (!ca.IsRequired || ((!conditionMet.HasValue || !conditionMet.Value) && conditionMet.HasValue))
+                        continue;
+                    var valuesStr = customAttributes.Where(x => x.Key == ca.Id).Select(x => x.Value).ToList();
+                        var enteredText = valuesStr.FirstOrDefault();
+                        var enteredTextLength = string.IsNullOrEmpty(enteredText) ? 0 : enteredText.Length;
 
-                            if (ca.ValidationMaxLength.Value < enteredTextLength)
-                            {
-                                warnings.Add(string.Format(_translationService.GetResource("ContactUs.TextboxMaximumLength"), ca.GetTranslation(a => a.Name, _workContext.WorkingLanguage.Id), ca.ValidationMaxLength.Value));
-                            }
+                        if (ca.ValidationMaxLength.Value < enteredTextLength)
+                        {
+                            warnings.Add(string.Format(_translationService.GetResource("ContactUs.TextboxMaximumLength"), ca.GetTranslation(a => a.Name, _workContext.WorkingLanguage.Id), ca.ValidationMaxLength.Value));
                         }
-                    }
                 }
             }
 
@@ -313,7 +305,7 @@ namespace Grand.Web.Commands.Handler.Common
                             Name = attributeValue.GetTranslation(x => x.Name, _workContext.WorkingLanguage.Id),
                             ColorSquaresRgb = attributeValue.ColorSquaresRgb,
                             IsPreSelected = attributeValue.IsPreSelected,
-                            DisplayOrder = attributeValue.DisplayOrder,
+                            DisplayOrder = attributeValue.DisplayOrder
                         };
                         attributeModel.Values.Add(attributeValueModel);
                     }
@@ -354,7 +346,7 @@ namespace Grand.Web.Commands.Handler.Common
                         {
                             if (selectedContactAttributes != null && selectedContactAttributes.Any())
                             {
-                                var enteredText = selectedContactAttributes.Where(x => x.Key == attribute.Id).Select(x => x.Value).ToList(); ;
+                                var enteredText = selectedContactAttributes.Where(x => x.Key == attribute.Id).Select(x => x.Value).ToList(); 
                                 if (enteredText.Any())
                                     attributeModel.DefaultValue = enteredText[0];
                             }
@@ -368,9 +360,8 @@ namespace Grand.Web.Commands.Handler.Common
                                 var selectedDateStr = selectedContactAttributes.Where(x => x.Key == attribute.Id).Select(x => x.Value).ToList();
                                 if (selectedDateStr.Any())
                                 {
-                                    DateTime selectedDate;
                                     if (DateTime.TryParseExact(selectedDateStr[0], "D", CultureInfo.CurrentCulture,
-                                                           DateTimeStyles.None, out selectedDate))
+                                            DateTimeStyles.None, out var selectedDate))
                                     {
                                         //successfully parsed
                                         attributeModel.SelectedDay = selectedDate.Day;
@@ -392,8 +383,6 @@ namespace Grand.Web.Commands.Handler.Common
                                     attributeModel.DefaultValue = download.DownloadGuid.ToString();
                             }
                         }
-                        break;
-                    default:
                         break;
                 }
 
